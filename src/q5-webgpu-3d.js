@@ -388,39 +388,73 @@
 			});
 		}
 
-		function initDepth() {
-			if (!Q5.device || !c.width || !c.height) return;
-			if (depthTexture) depthTexture.destroy();
-			depthTexture = Q5.device.createTexture({
-				size: [c.width, c.height],
-				format: 'depth24plus',
-				usage: GPUTextureUsage.RENDER_ATTACHMENT
-			});
+		let targetTexture = null;
+
+		function ensureTextures() {
+			if (!Q5.device) return;
+			const w = c.width || c.w || $.width || 400;
+			const h = c.height || c.h || $.height || 400;
+			if (!depthTexture || depthTexture.width !== w || depthTexture.height !== h) {
+				if (depthTexture) depthTexture.destroy();
+				depthTexture = Q5.device.createTexture({
+					size: [w, h],
+					format: 'depth24plus',
+					usage: GPUTextureUsage.RENDER_ATTACHMENT
+				});
+			}
+			if ($._isGraphics) {
+				if (!targetTexture || targetTexture.width !== w || targetTexture.height !== h) {
+					if (targetTexture) targetTexture.destroy();
+					const format = navigator.gpu ? navigator.gpu.getPreferredCanvasFormat() : 'bgra8unorm';
+					targetTexture = Q5.device.createTexture({
+						label: 'q5_3d_target_texture',
+						size: [w, h, 1],
+						format: format,
+						usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC
+					});
+					$._texture = targetTexture;
+					$.canvas._texture = targetTexture;
+					if ($._owner && typeof $._owner._addTexture === 'function') {
+						$._owner._addTexture($, targetTexture);
+					}
+				}
+			}
 		}
 
 		$._createCanvas = function (w, h, opt = {}) {
 			if (!navigator.gpu) return c;
-			ctx = q.ctx = q.drawingContext = c.getContext('webgpu');
-			if (!ctx) return c;
-
 			const format = navigator.gpu.getPreferredCanvasFormat();
-			const config = {
-				device: Q5.device,
-				format: format,
-				alphaMode: 'premultiplied'
+
+			const setup = () => {
+				const isNativeOffscreen = typeof globalThis !== 'undefined' && globalThis.__mystral && $._isGraphics;
+				console.log(`[q5-webgpu-3d.js:429] setup: isNativeOffscreen=${isNativeOffscreen} (globalThis.__mystral=${typeof globalThis !== 'undefined' ? globalThis.__mystral : 'undefined'}, $._isGraphics=${$._isGraphics})`);
+				if (!isNativeOffscreen && typeof c.getContext === 'function') {
+					try {
+						ctx = q.ctx = q.drawingContext = c.getContext('webgpu');
+						console.log(`[q5-webgpu-3d.js:433] c.getContext('webgpu') executed: ctx=${ctx ? 'GPUCanvasContext' : 'null'}`);
+						if (ctx) {
+							ctx.configure({
+								device: Q5.device,
+								format: format,
+								alphaMode: 'premultiplied'
+							});
+						}
+					} catch (e) {
+						console.error(`[q5-webgpu-3d.js:441] context configure error:`, e);
+					}
+				} else {
+					console.log(`[q5-webgpu-3d.js:444] Skipped c.getContext('webgpu') for native offscreen targetTexture`);
+				}
+				ensureTextures();
+				initPipelines();
 			};
 
 			if (Q5.device) {
-				ctx.configure(config);
-				initDepth();
-				initPipelines();
+				setup();
 			} else if (typeof Q5.initWebGPU === 'function') {
 				Q5.initWebGPU().then((supported) => {
 					if (supported && Q5.device) {
-						config.device = Q5.device;
-						ctx.configure(config);
-						initDepth();
-						initPipelines();
+						setup();
 					}
 				});
 			}
@@ -430,7 +464,7 @@
 
 		$._resizeCanvas = (w, h) => {
 			$._setCanvasSize(w, h);
-			initDepth();
+			ensureTextures();
 		};
 
 		// Transformations
@@ -708,18 +742,44 @@
 			lineVertices.length = 0;
 		};
 
+		let renderCount = 0;
+
 		// Flush WebGPU render commands
 		$._render = () => {
-			if (!Q5.device || !ctx) return;
+			if (!Q5.device) {
+				console.warn('[3D] _render: Q5.device not ready');
+				return;
+			}
+			if (triVertices.length === 0 && lineVertices.length === 0) {
+				return;
+			}
 			if (!triPipeline) initPipelines();
-			if (!depthTexture) initDepth();
+			ensureTextures();
 
 			const device = Q5.device;
 			let currentTextureView;
-			try {
-				currentTextureView = ctx.getCurrentTexture().createView();
-			} catch (e) {
+			let targetType = 'none';
+			if (ctx) {
+				try {
+					currentTextureView = ctx.getCurrentTexture().createView();
+					targetType = 'swapchain(ctx)';
+				} catch (e) {
+					if (targetTexture) {
+						currentTextureView = targetTexture.createView();
+						targetType = 'targetTexture(fallback)';
+					} else return;
+				}
+			} else if (targetTexture) {
+				currentTextureView = targetTexture.createView();
+				targetType = 'targetTexture';
+			} else {
+				console.warn('[3D] _render: no texture view available');
 				return;
+			}
+
+			renderCount++;
+			if (renderCount <= 5) {
+				console.log(`[3D] _render #${renderCount}: target=${targetType}, tris=${triVertices.length / FLOATS_PER_VERTEX}, lines=${lineVertices.length / FLOATS_PER_VERTEX}`);
 			}
 
 			// View & Projection

@@ -1,6 +1,7 @@
 Q5.modules.canvas = ($, q) => {
 	$._Canvas =
-		window.OffscreenCanvas ||
+		(typeof window !== 'undefined' && window.OffscreenCanvas) ||
+		(typeof globalThis !== 'undefined' && globalThis.OffscreenCanvas) ||
 		function () {
 			return document.createElement('canvas');
 		};
