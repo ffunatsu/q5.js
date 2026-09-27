@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>q5.js 3D WebGPU - Texture Mapping Test</title>
+  <style>
+    body {
+      margin: 0;
+      background: #101018;
+      color: #eee;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    canvas {
+      border: 1px solid #333;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.6);
+    }
+  </style>
+  <script src="../q5.js"></script>
+  <script src="../src/q5-webgpu-3d.js"></script>
+</head>
+<body>
+  <h2>q5.js 3D WebGPU - Texture Mapping (texture(img))</h2>
+  <script>
+    let pg3d;
+    let pgTex;
+
+    async function setup() {
+      if (typeof Q5.initWebGPU === 'function') {
+        await Q5.initWebGPU();
+      }
+
+      createCanvas(700, 500);
+      pg3d = createGraphics(700, 500, '3d');
+      pgTex = createGraphics(256, 256);
+    }
+
+    function updateTexture() {
+      pgTex.background(30, 40, 60);
+
+      // チェッカーボード
+      const s = 32;
+      for (let x = 0; x < 256; x += s) {
+        for (let y = 0; y < 256; y += s) {
+          if (((x / s + y / s) % 2) === 0) {
+            pgTex.fill(220, 230, 255);
+            pgTex.noStroke();
+            pgTex.rect(x, y, s, s);
+          }
+        }
+      }
+
+      // 動くアニメーション円
+      pgTex.fill(255, 80, 80);
+      pgTex.noStroke();
+      let cx = 128 + Math.cos(frameCount * 0.05) * 60;
+      let cy = 128 + Math.sin(frameCount * 0.05) * 60;
+      pgTex.circle(cx, cy, 50);
+
+      // ラベル
+      pgTex.fill(20);
+      pgTex.textSize(24);
+      pgTex.textAlign(CENTER, CENTER);
+      pgTex.text("WebGPU 3D", 128, 128);
+    }
+
+    function draw() {
+      if (!pg3d || !pgTex) return;
+
+      updateTexture();
+
+      // 1. 2D 背景
+      background(15, 18, 25);
+
+      // 2. 3D シーン
+      pg3d.clear();
+      pg3d.camera(300, -250, 350, 0, 0, 0, 0, 1, 0);
+      pg3d.orbitControl(true);
+
+      pg3d.directionalLight(255, 255, 255, 0.5, 0.8, 0.6);
+      pg3d.ambientLight(100, 100, 120);
+
+      // テクスチャをバインド
+      pg3d.texture(pgTex);
+
+      // A. テクスチャ付き回転ボックス
+      pg3d.push();
+      pg3d.translate(-100, 0, 0);
+      pg3d.rotateX(frameCount * 0.01);
+      pg3d.rotateY(frameCount * 0.015);
+      pg3d.fill(255, 255, 255);
+      pg3d.box(110);
+      pg3d.pop();
+
+      // B. テクスチャ付き球体
+      pg3d.push();
+      pg3d.translate(100, 0, 0);
+      pg3d.rotateY(frameCount * 0.02);
+      pg3d.fill(255, 255, 255);
+      pg3d.sphere(65, 24, 18);
+      pg3d.pop();
+
+      // C. テクスチャなし（カラーのみ）の床プレーン
+      pg3d.noTexture();
+      pg3d.push();
+      pg3d.translate(0, 100, 0);
+      pg3d.rotateX(Math.PI / 2);
+      pg3d.fill(50, 60, 80);
+      pg3d.plane(340, 340);
+      pg3d.pop();
+
+      // 3D 描画 & 2D 合成
+      pg3d.flush();
+      image(pg3d, 0, 0);
+
+      // 3. 2D オーバーレイ
+      fill(255);
+      noStroke();
+      textSize(16);
+      text("q5.js 3D WebGPU - Texture Mapping (texture(img))", 20, 30);
+      
+      // テクスチャのプレビューを左下に小さく表示
+      image(pgTex, 20, height - 100, 80, 80);
+      
+      fill(180);
+      textSize(12);
+      text("Dynamic Texture Preview (80x80)", 20, height - 10);
+      text("FPS: " + Math.round(frameRate()), 20, 55);
+      text("Drag mouse to orbit camera", 20, 80);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>q5.js 3D WebGPU - Dynamic Mesh & beginShape()</title>
+  <style>
+    body {
+      margin: 0;
+      background: #14141e;
+      color: #eee;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    canvas {
+      border: 1px solid #333;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.6);
+    }
+  </style>
+  <script src="../q5.js"></script>
+  <script src="../src/q5-webgpu-3d.js"></script>
+</head>
+<body>
+  <h2>q5.js 3D WebGPU - Dynamic Mesh & beginShape()</h2>
+  <script>
+    let pg3d;
+    const gridCols = 24;
+    const gridRows = 24;
+    const cellSize = 16;
+    const halfW = ((gridCols - 1) * cellSize) / 2;
+    const halfH = ((gridRows - 1) * cellSize) / 2;
+
+    const numVerts = gridCols * gridRows;
+    const positions = new Float32Array(numVerts * 3);
+    const uvs = new Float32Array(numVerts * 2);
+    const indices = [];
+    let waveMesh;
+
+    async function setup() {
+      if (typeof Q5.initWebGPU === 'function') {
+        await Q5.initWebGPU();
+      }
+
+      createCanvas(700, 500);
+      pg3d = createGraphics(700, 500, '3d');
+
+      // インデックスと UV の初期構築
+      for (let y = 0; y < gridRows; y++) {
+        for (let x = 0; x < gridCols; x++) {
+          const idx = y * gridCols + x;
+          uvs[idx * 2 + 0] = x / (gridCols - 1);
+          uvs[idx * 2 + 1] = y / (gridRows - 1);
+
+          if (x < gridCols - 1 && y < gridRows - 1) {
+            const i0 = y * gridCols + x;
+            const i1 = y * gridCols + (x + 1);
+            const i2 = (y + 1) * gridCols + (x + 1);
+            const i3 = (y + 1) * gridCols + x;
+
+            indices.push(i0, i1, i2);
+            indices.push(i0, i2, i3);
+          }
+        }
+      }
+
+      waveMesh = pg3d.createMesh({
+        positions: positions,
+        uvs: uvs,
+        indices: new Uint16Array(indices)
+      });
+    }
+
+    function draw() {
+      if (!pg3d || !waveMesh) return;
+
+      // 1. 2D 背景
+      background(20, 20, 30);
+
+      // 2. 3D シーン
+      pg3d.clear();
+      pg3d.camera(350, -280, 350, 0, 0, 0, 0, 1, 0);
+      pg3d.orbitControl(true);
+
+      pg3d.directionalLight(255, 240, 220, 0.6, 0.8, 0.4);
+      pg3d.ambientLight(70, 70, 90);
+
+      // --- A. Dynamic Mesh（毎フレーム波の高さを更新 & 法線再計算） ---
+      const time = frameCount * 0.04;
+      for (let y = 0; y < gridRows; y++) {
+        for (let x = 0; x < gridCols; x++) {
+          const idx = (y * gridCols + x) * 3;
+          const px = x * cellSize - halfW;
+          const pz = y * cellSize - halfH;
+          const dist = Math.hypot(px, pz);
+          const py = Math.sin(dist * 0.05 - time) * 25 + Math.cos(x * 0.3 + time) * 8;
+
+          positions[idx + 0] = px;
+          positions[idx + 1] = py;
+          positions[idx + 2] = pz;
+        }
+      }
+      waveMesh.setPositions(positions).computeNormals();
+
+      pg3d.push();
+      pg3d.translate(0, 30, 0);
+      pg3d.fill(60, 140, 240);
+      pg3d.drawMesh(waveMesh);
+      pg3d.pop();
+
+      // --- B. beginShape / vertex / endShape カスタム多面体 ---
+      pg3d.push();
+      pg3d.translate(0, -110, 0);
+      pg3d.rotateY(frameCount * 0.02);
+      pg3d.rotateX(frameCount * 0.015);
+
+      pg3d.fill(240, 180, 50);
+      pg3d.stroke(255, 255, 255);
+
+      const s = 40, h = 50;
+      pg3d.beginShape('TRIANGLES');
+      // 面 1
+      pg3d.normal(0, 0.7, 0.7);
+      pg3d.vertex(0, -h, 0, 0.5, 1);
+      pg3d.vertex(-s, 0, s, 0, 0);
+      pg3d.vertex(s, 0, s, 1, 0);
+      // 面 2
+      pg3d.normal(0.7, 0.7, 0);
+      pg3d.vertex(0, -h, 0, 0.5, 1);
+      pg3d.vertex(s, 0, s, 0, 0);
+      pg3d.vertex(s, 0, -s, 1, 0);
+      // 面 3
+      pg3d.normal(0, 0.7, -0.7);
+      pg3d.vertex(0, -h, 0, 0.5, 1);
+      pg3d.vertex(s, 0, -s, 0, 0);
+      pg3d.vertex(-s, 0, -s, 1, 0);
+      // 面 4
+      pg3d.normal(-0.7, 0.7, 0);
+      pg3d.vertex(0, -h, 0, 0.5, 1);
+      pg3d.vertex(-s, 0, -s, 0, 0);
+      pg3d.vertex(-s, 0, s, 1, 0);
+      pg3d.endShape();
+
+      pg3d.pop();
+
+      // 3D 描画 & 2D 合成
+      pg3d.flush();
+      image(pg3d, 0, 0);
+
+      // 3. 2D オーバーレイ
+      fill(255);
+      noStroke();
+      textSize(16);
+      text("q5.js 3D WebGPU - Dynamic Mesh & beginShape()", 20, 30);
+      textSize(13);
+      fill(180);
+      text(`Wave Mesh: ${gridCols}x${gridRows} vertices (${indices.length / 3} tris)`, 20, 55);
+      text("FPS: " + Math.round(frameRate()), 20, 78);
+      text("Drag mouse to orbit camera", 20, 101);
+    }
+  </script>
+</body>
+</html>

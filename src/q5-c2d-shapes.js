@@ -129,7 +129,15 @@ Q5.renderers.c2d.shapes = ($) => {
 
 	function rect(x, y, w, h) {
 		$.ctx.beginPath();
-		$.ctx.rect(x, y, w, h);
+		if (typeof $.ctx.rect === 'function') {
+			$.ctx.rect(x, y, w, h);
+		} else {
+			$.ctx.moveTo(x, y);
+			$.ctx.lineTo(x + w, y);
+			$.ctx.lineTo(x + w, y + h);
+			$.ctx.lineTo(x, y + h);
+			$.ctx.closePath();
+		}
 		ink();
 	}
 

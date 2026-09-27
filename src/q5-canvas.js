@@ -125,6 +125,7 @@ Q5.modules.canvas = ($, q) => {
 
 	$.createGraphics = function (w, h, opt = {}) {
 		if (typeof opt == 'string') opt = { renderer: opt };
+		if (opt.renderer == '2d') opt.renderer = 'c2d';
 		let g = new Q5('graphics', undefined, opt.renderer || ($._webgpuFallback ? 'webgpu-fallback' : $._renderer));
 		opt.alpha ??= true;
 		opt.colorSpace ??= $.canvas.colorSpace;

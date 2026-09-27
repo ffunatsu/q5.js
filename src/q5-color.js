@@ -287,7 +287,7 @@ Q5.ColorRGB_8 = class extends Q5.ColorRGB {
 		this.a = v;
 	}
 	toString() {
-		return `rgb(${this.r} ${this.g} ${this.b} / ${this.a / 255})`;
+		return `rgba(${this.r}, ${this.g}, ${this.b}, ${this.a / 255})`;
 	}
 };
 
