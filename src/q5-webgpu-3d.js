@@ -165,6 +165,11 @@
 		let ambientLightColor = [0.25, 0.25, 0.25];
 		let dirLightColor = [0.85, 0.85, 0.85];
 		let dirLightDir = [0.577, 0.577, 0.577];
+		let pointLightPos = [0, 0, 0];
+		let pointLightColor = [0, 0, 0, 0]; // alpha <= 0 means disabled
+		let spotLightPos = [0, 0, 0];
+		let spotLightDir = [0, 0, -1, Math.PI / 6]; // xyz: dir, w: angle
+		let spotLightColor = [0, 0, 0, 0]; // alpha <= 0 means disabled
 
 		// Styles
 		let currentFill = [0.8, 0.8, 0.8, 1.0];
@@ -197,7 +202,12 @@
 				u_mvp : mat4x4<f32>,
 				u_ambientColor : vec4<f32>,
 				u_dirColor : vec4<f32>,
-				u_dirDir : vec4<f32>
+				u_dirDir : vec4<f32>,
+				u_pointPos : vec4<f32>,
+				u_pointColor : vec4<f32>,
+				u_spotPos : vec4<f32>,
+				u_spotDir : vec4<f32>,
+				u_spotColor : vec4<f32>
 			};
 
 			@group(0) @binding(0) var<uniform> uniforms : Uniforms;
@@ -211,7 +221,8 @@
 			struct VertexOutput {
 				@builtin(position) position : vec4<f32>,
 				@location(0) v_color : vec4<f32>,
-				@location(1) v_normal : vec3<f32>
+				@location(1) v_normal : vec3<f32>,
+				@location(2) v_worldPos : vec3<f32>
 			};
 
 			@vertex
@@ -220,16 +231,48 @@
 				out.position = uniforms.u_mvp * vec4<f32>(in.position, 1.0);
 				out.v_color = in.color;
 				out.v_normal = in.normal;
+				out.v_worldPos = in.position;
 				return out;
 			}
 
 			@fragment
 			fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
 				var n : vec3<f32> = normalize(in.v_normal);
-				var l : vec3<f32> = normalize(uniforms.u_dirDir.xyz);
-				var diff : f32 = max(dot(n, l), 0.0);
-				var light : vec3<f32> = uniforms.u_ambientColor.rgb + uniforms.u_dirColor.rgb * diff;
-				return vec4<f32>(in.v_color.rgb * light, in.v_color.a);
+				
+				// 1. Ambient Light
+				var totalLight : vec3<f32> = uniforms.u_ambientColor.rgb;
+
+				// 2. Directional Light
+				var lDir : vec3<f32> = normalize(uniforms.u_dirDir.xyz);
+				var diffDir : f32 = max(dot(n, lDir), 0.0);
+				totalLight += uniforms.u_dirColor.rgb * diffDir;
+
+				// 3. Point Light (with attenuation)
+				if (uniforms.u_pointColor.a > 0.0) {
+					var pVec : vec3<f32> = uniforms.u_pointPos.xyz - in.v_worldPos;
+					var dist : f32 = length(pVec);
+					var pDir : vec3<f32> = normalize(pVec);
+					var diffPoint : f32 = max(dot(n, pDir), 0.0);
+					var atten : f32 = 1.0 / (1.0 + 0.005 * dist + 0.00005 * dist * dist);
+					totalLight += uniforms.u_pointColor.rgb * diffPoint * atten;
+				}
+
+				// 4. Spot Light (with cone cutoff & attenuation)
+				if (uniforms.u_spotColor.a > 0.0) {
+					var sVec : vec3<f32> = uniforms.u_spotPos.xyz - in.v_worldPos;
+					var sDist : f32 = length(sVec);
+					var sDir : vec3<f32> = normalize(sVec);
+					var spotAngle : f32 = dot(-sDir, normalize(uniforms.u_spotDir.xyz));
+					var cutoff : f32 = cos(uniforms.u_spotDir.w);
+					if (spotAngle > cutoff) {
+						var spotDiff : f32 = max(dot(n, sDir), 0.0);
+						var spotAtten : f32 = 1.0 / (1.0 + 0.003 * sDist);
+						var intensity : f32 = clamp((spotAngle - cutoff) / (1.0 - cutoff), 0.0, 1.0);
+						totalLight += uniforms.u_spotColor.rgb * spotDiff * spotAtten * intensity;
+					}
+				}
+
+				return vec4<f32>(in.v_color.rgb * totalLight, in.v_color.a);
 			}
 
 			@vertex
@@ -335,7 +378,7 @@
 			});
 
 			uniformBuffer = device.createBuffer({
-				size: 112, // 16*4 (mvp) + 4*4 (ambient) + 4*4 (dirColor) + 4*4 (dirDir) = 112 bytes
+				size: 192, // 16*4 (mvp) + 4*4*8 (ambient, dirColor, dirDir, pointPos, pointColor, spotPos, spotDir, spotColor) = 192 bytes
 				usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
 			});
 
@@ -470,8 +513,23 @@
 			}
 		};
 
-		$.orbitControl = (sensitivityX = 0.01, sensitivityY = 0.01) => {
-			orbitEnabled = true;
+		$.orbitControl = function (a = true, b = 0.01, c = 0.01) {
+			let sensitivityX = 0.01;
+			let sensitivityY = 0.01;
+
+			if (typeof a === 'boolean') {
+				orbitEnabled = a;
+				if (!orbitEnabled) return;
+				if (typeof b === 'number') sensitivityX = b;
+				if (typeof c === 'number') sensitivityY = c;
+				else if (typeof b === 'number') sensitivityY = b;
+			} else {
+				orbitEnabled = true;
+				if (typeof a === 'number') sensitivityX = a;
+				if (typeof b === 'number') sensitivityY = b;
+				else if (typeof a === 'number') sensitivityY = a;
+			}
+
 			const isPressed = $.mouseIsPressed || window.mouseIsPressed || Q5.mouseIsPressed || ($._parent && $._parent.mouseIsPressed);
 			if (isPressed) {
 				const dx = $.movedX || window.movedX || (window.mouseX !== undefined && window.pmouseX !== undefined ? window.mouseX - window.pmouseX : 0);
@@ -489,6 +547,16 @@
 			dirLightColor = [r / 255, g / 255, b / 255];
 			const len = Math.hypot(x, y, z) || 1;
 			dirLightDir = [x / len, y / len, z / len];
+		};
+		$.pointLight = (r, g, b, x = 0, y = 0, z = 0) => {
+			pointLightColor = [r / 255, g / 255, b / 255, 1.0];
+			pointLightPos = [x, y, z];
+		};
+		$.spotLight = (r, g, b, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = -1, angle = Math.PI / 6) => {
+			spotLightColor = [r / 255, g / 255, b / 255, 1.0];
+			spotLightPos = [x, y, z];
+			const len = Math.hypot(rx, ry, rz) || 1;
+			spotLightDir = [rx / len, ry / len, rz / len, angle];
 		};
 
 		// Style & Colors
@@ -668,12 +736,17 @@
 
 			const mvp = Mat4.multiply(proj, view);
 
-			// Update Uniforms
-			const uniformData = new Float32Array(28); // 16 + 4 + 4 + 4
+			// Update Uniforms (48 floats = 192 bytes)
+			const uniformData = new Float32Array(48);
 			uniformData.set(mvp, 0);
 			uniformData.set([ambientLightColor[0], ambientLightColor[1], ambientLightColor[2], 1.0], 16);
 			uniformData.set([dirLightColor[0], dirLightColor[1], dirLightColor[2], 1.0], 20);
 			uniformData.set([dirLightDir[0], dirLightDir[1], dirLightDir[2], 0.0], 24);
+			uniformData.set([pointLightPos[0], pointLightPos[1], pointLightPos[2], 1.0], 28);
+			uniformData.set(pointLightColor, 32);
+			uniformData.set([spotLightPos[0], spotLightPos[1], spotLightPos[2], 1.0], 36);
+			uniformData.set(spotLightDir, 40);
+			uniformData.set(spotLightColor, 44);
 			device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
 			// Command Encoder

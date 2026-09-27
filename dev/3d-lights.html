@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>q5.js 3D - Lighting Interactive Test</title>
+  <style>
+    body {
+      margin: 0;
+      background: #14141a;
+      color: #eee;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    canvas {
+      border: 1px solid #333;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.7);
+      border-radius: 4px;
+    }
+    .controls {
+      margin-top: 12px;
+      display: flex;
+      gap: 10px;
+    }
+    button {
+      background: #232b38;
+      color: #fff;
+      border: 1px solid #445870;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button.active {
+      background: #3a689b;
+      border-color: #619bd6;
+    }
+  </style>
+  <script src="../q5.js"></script>
+  <script src="../src/q5-webgpu-3d.js"></script>
+</head>
+<body>
+  <h2>q5.js 3D - Lights (Directional, Point, Spot)</h2>
+  <div class="controls">
+    <button id="btn-dir" class="active" onclick="setLightMode('dir')">1. Directional Light</button>
+    <button id="btn-point" onclick="setLightMode('point')">2. Orbiting Point Light</button>
+    <button id="btn-spot" onclick="setLightMode('spot')">3. Focused Spot Light</button>
+  </div>
+  <p style="color: #aaa; font-size: 14px;">Drag mouse to orbit view | Press [1], [2], [3] to toggle lighting modes</p>
+
+  <script>
+    let pg3d;
+    let lightMode = 'dir'; // 'dir', 'point', 'spot'
+
+    async function setup() {
+      if (typeof Q5.initWebGPU === 'function') {
+        await Q5.initWebGPU();
+      }
+
+      createCanvas(700, 480);
+      pg3d = createGraphics(700, 480, '3d');
+    }
+
+    function setLightMode(mode) {
+      lightMode = mode;
+      document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+      const activeBtn = document.getElementById('btn-' + mode);
+      if (activeBtn) activeBtn.classList.add('active');
+    }
+
+    function keyPressed() {
+      if (key === '1') setLightMode('dir');
+      if (key === '2') setLightMode('point');
+      if (key === '3') setLightMode('spot');
+    }
+
+    function draw() {
+      if (!pg3d) return;
+
+      // 1. 2D Background
+      background(15, 16, 22);
+
+      // 2. 3D Scene
+      pg3d.clear();
+      pg3d.orbitControl();
+
+      // Base Ambient Light
+      pg3d.ambientLight(30, 30, 40);
+
+      // Lighting configuration
+      let time = frameCount * 0.03;
+      let lightX = Math.cos(time) * 160;
+      let lightZ = Math.sin(time) * 160;
+
+      if (lightMode === 'dir') {
+        pg3d.directionalLight(255, 230, 190, 1, 1.2, -1);
+      } else if (lightMode === 'point') {
+        // Dynamic Orbiting Point Light (Warm Orange)
+        pg3d.pointLight(255, 140, 40, lightX, -80, lightZ);
+      } else if (lightMode === 'spot') {
+        // Spot Light pointing downwards (Bright Cyan)
+        let spotX = Math.cos(time * 0.5) * 80;
+        pg3d.spotLight(80, 220, 255, spotX, -220, 0, 0, 1, 0, Math.PI / 7);
+      }
+
+      // 3D Objects in grid
+      pg3d.push();
+
+      // Center Big Sphere
+      pg3d.push();
+      pg3d.fill(220, 220, 230);
+      pg3d.noStroke();
+      pg3d.sphere(60, 24, 18);
+      pg3d.pop();
+
+      // Surrounding Boxes
+      for (let i = 0; i < 4; i++) {
+        let angle = (i / 4) * Math.PI * 2;
+        pg3d.push();
+        pg3d.translate(Math.cos(angle) * 120, 20, Math.sin(angle) * 120);
+        pg3d.fill(130, 170, 220);
+        pg3d.stroke(255, 255, 255);
+        pg3d.box(40);
+        pg3d.pop();
+      }
+
+      // Point Light indicator if active
+      if (lightMode === 'point') {
+        pg3d.push();
+        pg3d.translate(lightX, -80, lightZ);
+        pg3d.fill(255, 200, 50);
+        pg3d.noStroke();
+        pg3d.sphere(8, 8, 8);
+        pg3d.pop();
+      }
+
+      pg3d.pop();
+
+      // Submit 3D render
+      pg3d.flush();
+
+      // 3. Composite into 2D canvas
+      image(pg3d, 0, 0);
+
+      // 4. 2D Foreground Overlay
+      fill(255);
+      noStroke();
+      textSize(15);
+      let desc = {
+        'dir': 'Directional Light (Sun-like parallel rays)',
+        'point': 'Point Light (Spherical point source with distance attenuation)',
+        'spot': 'Spot Light (Cone beam with penumbra & focus angle)'
+      }[lightMode];
+      text("Active Light: " + desc, 20, 30);
+      text("FPS: " + Math.round(frameRate()), 20, 55);
+    }
+  </script>
+</body>
+</html>
