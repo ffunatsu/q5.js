@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>q5.js 3D WebGPU Test</title>
+  <style>
+    body {
+      margin: 0;
+      background: #1e1e24;
+      color: #eee;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    canvas {
+      border: 1px solid #444;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+  </style>
+  <script src="../q5.js"></script>
+  <script src="../src/q5-webgpu-3d.js"></script>
+</head>
+<body>
+  <h2>q5.js 3D (WebGPU) + 2D Layering Prototype</h2>
+  <script>
+    let pg3d;
+
+    async function setup() {
+      // 1. Initialize WebGPU
+      if (typeof Q5.initWebGPU === 'function') {
+        await Q5.initWebGPU();
+      }
+
+      // 2. Create 2D Main Canvas
+      createCanvas(600, 400);
+
+      // 3. Create 3D Graphics layer
+      pg3d = createGraphics(600, 400, '3d');
+    }
+
+    function draw() {
+      if (!pg3d) return;
+
+      // 1. 2D Background
+      background(25, 30, 45);
+
+      // 2. 3D Graphics Drawing
+      pg3d.clear();
+      pg3d.orbitControl();
+      
+      pg3d.directionalLight(255, 230, 180, 1, 1, -1);
+      pg3d.ambientLight(60, 60, 80);
+
+      pg3d.push();
+      // OrbitControl will handle rotation on drag
+
+      // 3D Box
+      pg3d.fill(80, 160, 240);
+      pg3d.stroke(255, 255, 255);
+      pg3d.box(120);
+
+      // 3D Axis Lines
+      pg3d.stroke(255, 80, 80);
+      pg3d.line(-120, 0, 0, 120, 0, 0);
+      pg3d.stroke(80, 255, 80);
+      pg3d.line(0, -120, 0, 0, 120, 0);
+      pg3d.stroke(80, 80, 255);
+      pg3d.line(0, 0, -120, 0, 0, 120);
+      pg3d.pop();
+
+      // Submit 3D rendering
+      pg3d.flush();
+
+      // 3. Composite 3D layer into 2D Canvas
+      image(pg3d, 0, 0);
+
+      // 4. 2D Foreground (UI / Text)
+      fill(255);
+      noStroke();
+      textSize(16);
+      text("q5.js 3D WebGPU Layer", 20, 30);
+      text("FPS: " + Math.round(frameRate()), 20, 55);
+      text("Drag mouse to orbit camera", 20, 80);
+    }
+  </script>
+</body>
+</html>
