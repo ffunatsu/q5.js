@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>q5.js 3D - Camera & Projection Interactive Test</title>
+  <style>
+    body {
+      margin: 0;
+      background: #181820;
+      color: #eee;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    canvas {
+      border: 1px solid #444;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+      border-radius: 4px;
+    }
+    .controls {
+      margin-top: 12px;
+      display: flex;
+      gap: 12px;
+    }
+    button {
+      background: #2b3a4a;
+      color: #fff;
+      border: 1px solid #4a627a;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button:hover {
+      background: #3d5269;
+    }
+  </style>
+  <script src="../q5.js"></script>
+  <script src="../src/q5-webgpu-3d.js"></script>
+</head>
+<body>
+  <h2>q5.js 3D - Camera & Projection Controls</h2>
+  <div class="controls">
+    <button onclick="toggleProjection()">Toggle Projection (Space)</button>
+    <button onclick="toggleCameraPos()">Cycle Camera (C)</button>
+    <button onclick="resetView()">Reset View (R)</button>
+  </div>
+  <p style="color: #aaa; font-size: 14px;">Drag mouse to orbit | [Space]: Ortho/Perspective | [C]: Camera angle | [1, 2, 3]: Primitives</p>
+
+  <script>
+    let pg3d;
+    let isOrthoMode = false;
+    let cameraMode = 0; // 0: Front-top, 1: Isometric, 2: Top-down
+    let showShape = 0;  // 0: All, 1: Box, 2: Sphere
+
+    async function setup() {
+      if (typeof Q5.initWebGPU === 'function') {
+        await Q5.initWebGPU();
+      }
+
+      createCanvas(700, 480);
+      pg3d = createGraphics(700, 480, '3d');
+      updateProjection();
+    }
+
+    function toggleProjection() {
+      isOrthoMode = !isOrthoMode;
+      updateProjection();
+    }
+
+    function updateProjection() {
+      if (!pg3d) return;
+      if (isOrthoMode) {
+        pg3d.ortho(-350, 350, -240, 240, -2000, 2000);
+      } else {
+        pg3d.perspective(Math.PI / 3, 700 / 480, 0.1, 5000);
+      }
+    }
+
+    function toggleCameraPos() {
+      cameraMode = (cameraMode + 1) % 3;
+      applyCameraPreset();
+    }
+
+    function resetView() {
+      cameraMode = 0;
+      applyCameraPreset();
+    }
+
+    function applyCameraPreset() {
+      if (!pg3d) return;
+      if (cameraMode === 0) {
+        pg3d.camera(0, -100, 450, 0, 0, 0, 0, 1, 0);
+      } else if (cameraMode === 1) {
+        pg3d.camera(300, -300, 300, 0, 0, 0, 0, 1, 0);
+      } else if (cameraMode === 2) {
+        pg3d.camera(0, -500, 1, 0, 0, 0, 0, 0, -1);
+      }
+    }
+
+    function keyPressed() {
+      if (key === ' ' || keyCode === 32) toggleProjection();
+      if (key === 'c' || key === 'C') toggleCameraPos();
+      if (key === 'r' || key === 'R') resetView();
+      if (key === '1') showShape = 0;
+      if (key === '2') showShape = 1;
+      if (key === '3') showShape = 2;
+    }
+
+    function draw() {
+      if (!pg3d) return;
+
+      // 1. 2D Background
+      background(20, 24, 34);
+
+      // 2. 3D Graphics Scene
+      pg3d.clear();
+      pg3d.orbitControl();
+      
+      pg3d.directionalLight(255, 235, 200, 1, 1.5, -1);
+      pg3d.ambientLight(70, 70, 90);
+
+      // Coordinate Grid Lines
+      pg3d.strokeWeight(1);
+      pg3d.stroke(255, 70, 70); // X-axis (Red)
+      pg3d.line(-200, 0, 0, 200, 0, 0);
+      pg3d.stroke(70, 255, 70); // Y-axis (Green)
+      pg3d.line(0, -200, 0, 0, 200, 0);
+      pg3d.stroke(70, 120, 255); // Z-axis (Blue)
+      pg3d.line(0, 0, -200, 0, 0, 200);
+
+      // Rotating Objects
+      pg3d.push();
+      pg3d.rotateY(frameCount * 0.01);
+
+      // Central Box
+      if (showShape === 0 || showShape === 1) {
+        pg3d.push();
+        pg3d.translate(-70, 0, 0);
+        pg3d.fill(60, 150, 240);
+        pg3d.stroke(255, 255, 255);
+        pg3d.box(80);
+        pg3d.pop();
+      }
+
+      // Sphere
+      if (showShape === 0 || showShape === 2) {
+        pg3d.push();
+        pg3d.translate(70, 0, 0);
+        pg3d.fill(240, 120, 80);
+        pg3d.noStroke();
+        pg3d.sphere(45, 20, 16);
+        pg3d.pop();
+      }
+
+      // 3D Points Ring
+      pg3d.stroke(255, 220, 100);
+      for (let i = 0; i < 16; i++) {
+        let a = (i / 16) * Math.PI * 2;
+        pg3d.point(Math.cos(a) * 140, -60, Math.sin(a) * 140);
+      }
+
+      pg3d.pop();
+
+      // Submit 3D commands
+      pg3d.flush();
+
+      // 3. Composite 3D layer into 2D canvas
+      image(pg3d, 0, 0);
+
+      // 4. 2D Foreground HUD / UI
+      fill(255);
+      noStroke();
+      textSize(15);
+      text("Projection: " + (isOrthoMode ? "ORTHOGRAPHIC (Parallel)" : "PERSPECTIVE (3D Depth)"), 20, 30);
+      text("Camera Mode: " + ["Perspective Front", "Isometric Angle", "Top-Down"][cameraMode], 20, 52);
+      text("FPS: " + Math.round(frameRate()), 20, 74);
+    }
+  </script>
+</body>
+</html>

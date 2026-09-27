@@ -26,9 +26,23 @@
 			const out = new Float32Array(16);
 			out[0] = f / aspect;
 			out[5] = f;
-			out[10] = (far + near) * nf;
+			out[10] = far * nf;
 			out[11] = -1;
-			out[14] = (2 * far * near) * nf;
+			out[14] = near * far * nf;
+			return out;
+		},
+		ortho(left, right, bottom, top, near, far) {
+			const lr = 1 / (left - right);
+			const bt = 1 / (bottom - top);
+			const nf = 1 / (near - far);
+			const out = new Float32Array(16);
+			out[0] = -2 * lr;
+			out[5] = -2 * bt;
+			out[10] = nf;
+			out[12] = (left + right) * lr;
+			out[13] = (top + bottom) * bt;
+			out[14] = near * nf;
+			out[15] = 1;
 			return out;
 		},
 		lookAt(eye, center, up) {
@@ -403,11 +417,57 @@
 			modelMatrix = Mat4.identity();
 		};
 
+		// Camera & Projection defaults
+		let isOrtho = false;
+		let orthoBounds = { left: -200, right: 200, bottom: -200, top: 200, near: -1000, far: 1000 };
+
+		$.perspective = (f = Math.PI / 3, a = (c.w || 400) / (c.h || 400), n = 0.1, fa = 5000) => {
+			isOrtho = false;
+			fovy = f;
+			near = n;
+			far = fa;
+		};
+
+		$.ortho = (left, right, bottom, top, nearVal = -1000, farVal = 1000) => {
+			isOrtho = true;
+			const hw = (c.w || 400) / 2;
+			const hh = (c.h || 400) / 2;
+			orthoBounds = {
+				left: left !== undefined ? left : -hw,
+				right: right !== undefined ? right : hw,
+				bottom: bottom !== undefined ? bottom : -hh,
+				top: top !== undefined ? top : hh,
+				near: nearVal,
+				far: farVal
+			};
+		};
+
 		// Camera
 		$.camera = (eyeX = 0, eyeY = 0, eyeZ = 400, cx = 0, cy = 0, cz = 0, ux = 0, uy = 1, uz = 0) => {
 			eye = [eyeX, eyeY, eyeZ];
 			center = [cx, cy, cz];
 			up = [ux, uy, uz];
+		};
+
+		$.createCamera = () => {
+			const cam = {
+				eye: [0, 0, 400],
+				center: [0, 0, 0],
+				up: [0, 1, 0],
+				setPosition(x, y, z) { cam.eye = [x, y, z]; },
+				lookAt(x, y, z) { cam.center = [x, y, z]; },
+				perspective(f, a, n, fa) { $.perspective(f, a, n, fa); },
+				ortho(l, r, b, t, n, fa) { $.ortho(l, r, b, t, n, fa); }
+			};
+			return cam;
+		};
+
+		$.setCamera = (cam) => {
+			if (cam && cam.eye) {
+				eye = cam.eye;
+				center = cam.center;
+				up = cam.up;
+			}
 		};
 
 		$.orbitControl = (sensitivityX = 0.01, sensitivityY = 0.01) => {
@@ -596,7 +656,9 @@
 
 			// View & Projection
 			const aspect = (c.w || 400) / (c.h || 400);
-			const proj = Mat4.perspective(fovy, aspect, near, far);
+			const proj = isOrtho
+				? Mat4.ortho(orthoBounds.left, orthoBounds.right, orthoBounds.bottom, orthoBounds.top, orthoBounds.near, orthoBounds.far)
+				: Mat4.perspective(fovy, aspect, near, far);
 			let view = Mat4.lookAt(eye, center, up);
 
 			if (orbitEnabled) {
