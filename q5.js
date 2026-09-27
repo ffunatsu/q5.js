@@ -1468,6 +1468,40 @@ Q5.renderers.c2d.image = ($, q) => {
 		let g = $.createImage(1, 1, opt);
 		let pd = g._pixelDensity;
 
+		if (typeof window.Image != 'function' && typeof createImageBitmap == 'function') {
+			g.promise = fetch(url)
+				.then((res) => {
+					if (!res.ok) throw new Error(`Failed to load image: ${res.status}`);
+					return createImageBitmap(res);
+				})
+				.then((bitmap) => {
+					delete g.then;
+					g = $.createImage(Math.ceil(bitmap.width / pd), Math.ceil(bitmap.height / pd), opt);
+					g.defaultWidth = bitmap.width * $._defaultImageScale;
+					g.defaultHeight = bitmap.height * $._defaultImageScale;
+					g.naturalWidth = bitmap.width;
+					g.naturalHeight = bitmap.height;
+					g.ctx.putImageData(
+						{
+							width: bitmap.width,
+							height: bitmap.height,
+							data: new Uint8Array(bitmap._data)
+						},
+						0,
+						0
+					);
+					bitmap.close?.();
+					if (cb) cb(g);
+					return g;
+				});
+			$._loaders.push(g.promise);
+			g.then = (resolve, reject) => {
+				g._usedAwait = true;
+				return g.promise.then(resolve, reject);
+			};
+			return g;
+		}
+
 		let img = new window.Image();
 		img.crossOrigin = 'Anonymous';
 
@@ -2282,8 +2316,8 @@ Q5.renderers.c2d.text = ($, q) => {
 					if (lineWidth > maxWidth) maxWidth = lineWidth;
 				}
 
-				let imgW = Math.ceil(maxWidth),
-					imgH = Math.ceil(leading * lines.length + descent);
+				let imgW = Math.max(1, Math.ceil(maxWidth)),
+					imgH = Math.max(1, Math.ceil(leading * lines.length + descent));
 
 				img = $.createImage.call($, imgW, imgH, {
 					pixelDensity: $._pixelDensity,
@@ -4718,16 +4752,18 @@ Q5.modules.sound = ($, q) => {
 	$.getAudioContext = () => Q5.aud;
 
 	$.userStartAudio = () => {
+		if (globalThis.__mystral && !Q5.aud) {
+			Q5.aud = window.AudioContext ? window.AudioContext() : { state: 'running', resume() {} };
+		}
 		if (window.AudioContext) {
 			if (Q5._offlineAudio) {
 				Q5._offlineAudio = false;
 				Q5.aud = new window.AudioContext();
+			}
+			if (!Q5.soundOut && Q5.aud.createGain) {
 				Q5.soundOut = Q5.aud.createGain();
 				Q5.soundOut.connect(Q5.aud.destination);
-
-				for (let inst of Q5.instances) {
-					inst._userAudioStarted();
-				}
+				for (let inst of Q5.instances) inst._userAudioStarted();
 			}
 			return Q5.aud.resume();
 		}
@@ -4768,7 +4804,7 @@ Q5.Sound = class {
 		if (!this.buffer.length) return;
 
 		this.gainNode = Q5.aud.createGain();
-		this.pannerNode = Q5.aud.createStereoPanner();
+		this.pannerNode = Q5.aud.createStereoPanner ? Q5.aud.createStereoPanner() : this.gainNode;
 		this.gainNode.connect(this.pannerNode);
 		this.pannerNode.connect(Q5.soundOut);
 
@@ -4780,6 +4816,7 @@ Q5.Sound = class {
 	_newSource(offset, duration) {
 		let source = Q5.aud.createBufferSource();
 		source.buffer = this.buffer;
+		if (source._setBuffer) source._setBuffer(this.buffer);
 		source.connect(this.gainNode);
 		source.loop = this._loop;
 
@@ -7993,6 +8030,55 @@ fn fragMain(f: FragParams) -> @location(0) vec4f {
 		$._makeDrawable(g);
 		// assume the user will draw to the image canvas
 		g.modified = true;
+		g.setExternalPixels = (data, format = CANVAS_FORMAT) => {
+			if (!g._texture || !data) return false;
+			if (format !== CANVAS_FORMAT) {
+				throw new Error(`External pixel format ${format} does not match canvas format ${CANVAS_FORMAT}`);
+			}
+			const bytesPerRow = g.width * 4;
+			if (bytesPerRow % 256 !== 0) {
+				throw new Error(`External pixel row pitch must be 256-byte aligned: ${bytesPerRow}`);
+			}
+			Q5.device.queue.writeTexture(
+				{ texture: g._texture },
+				data,
+				{ bytesPerRow, rowsPerImage: g.height },
+				[g.width, g.height, 1]
+			);
+			g.modified = false;
+			g.frameCount++;
+			return true;
+		};
+		return g;
+	};
+
+	$.createCompressedImage = (w, h, format = 'bc3-rgba-unorm') => {
+		if (!Q5.device.features.has('texture-compression-bc')) {
+			throw new Error('WebGPU texture-compression-bc is required for compressed GV textures');
+		}
+		let g = $._g.createImage(w, h);
+		let texture = Q5.device.createTexture({
+			size: [w, h, 1],
+			format,
+			usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST
+		});
+		$._addTexture(g, texture);
+		g.modified = false;
+		g.setCompressedPixels = (data) => {
+			const blockBytes = format === 'bc1-rgba-unorm' ? 8 : 16;
+			const bytesPerRow = Math.ceil(w / 4) * blockBytes;
+			if (bytesPerRow % 256 !== 0) {
+				throw new Error(`Compressed GV row pitch must be 256-byte aligned: ${bytesPerRow}`);
+			}
+			Q5.device.queue.writeTexture(
+				{ texture: g._texture },
+				data,
+				{ bytesPerRow, rowsPerImage: Math.ceil(h / 4) },
+				[w, h, 1]
+			);
+			g.frameCount++;
+			return true;
+		};
 		return g;
 	};
 
@@ -9062,7 +9148,11 @@ Q5._requestGPU = async () => {
 			return false;
 		}
 
-		let device = await adapter.requestDevice();
+		const requiredFeatures = [];
+		if (adapter.features.has('texture-compression-bc')) {
+			requiredFeatures.push('texture-compression-bc');
+		}
+		let device = await adapter.requestDevice({ requiredFeatures });
 
 		const vertexStorageLimit =
 			device.limits.maxStorageBuffersInVertexStage ?? device.limits.maxStorageBuffersPerShaderStage;
@@ -9084,6 +9174,7 @@ Q5._requestGPU = async () => {
 		Q5.MAX_TEXTS = min(Q5.MAX_TEXTS, floor(maxStorage / 32));
 
 		device.lost.then((e) => {
+			if (!e || (e.reason === undefined && e.message === undefined)) return;
 			console.error('WebGPU crashed!');
 			console.error(e);
 		});

@@ -2563,6 +2563,55 @@ fn fragMain(f: FragParams) -> @location(0) vec4f {
 		$._makeDrawable(g);
 		// assume the user will draw to the image canvas
 		g.modified = true;
+		g.setExternalPixels = (data, format = CANVAS_FORMAT) => {
+			if (!g._texture || !data) return false;
+			if (format !== CANVAS_FORMAT) {
+				throw new Error(`External pixel format ${format} does not match canvas format ${CANVAS_FORMAT}`);
+			}
+			const bytesPerRow = g.width * 4;
+			if (bytesPerRow % 256 !== 0) {
+				throw new Error(`External pixel row pitch must be 256-byte aligned: ${bytesPerRow}`);
+			}
+			Q5.device.queue.writeTexture(
+				{ texture: g._texture },
+				data,
+				{ bytesPerRow, rowsPerImage: g.height },
+				[g.width, g.height, 1]
+			);
+			g.modified = false;
+			g.frameCount++;
+			return true;
+		};
+		return g;
+	};
+
+	$.createCompressedImage = (w, h, format = 'bc3-rgba-unorm') => {
+		if (!Q5.device.features.has('texture-compression-bc')) {
+			throw new Error('WebGPU texture-compression-bc is required for compressed GV textures');
+		}
+		let g = $._g.createImage(w, h);
+		let texture = Q5.device.createTexture({
+			size: [w, h, 1],
+			format,
+			usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST
+		});
+		$._addTexture(g, texture);
+		g.modified = false;
+		g.setCompressedPixels = (data) => {
+			const blockBytes = format === 'bc1-rgba-unorm' ? 8 : 16;
+			const bytesPerRow = Math.ceil(w / 4) * blockBytes;
+			if (bytesPerRow % 256 !== 0) {
+				throw new Error(`Compressed GV row pitch must be 256-byte aligned: ${bytesPerRow}`);
+			}
+			Q5.device.queue.writeTexture(
+				{ texture: g._texture },
+				data,
+				{ bytesPerRow, rowsPerImage: Math.ceil(h / 4) },
+				[w, h, 1]
+			);
+			g.frameCount++;
+			return true;
+		};
 		return g;
 	};
 
@@ -3632,7 +3681,11 @@ Q5._requestGPU = async () => {
 			return false;
 		}
 
-		let device = await adapter.requestDevice();
+		const requiredFeatures = [];
+		if (adapter.features.has('texture-compression-bc')) {
+			requiredFeatures.push('texture-compression-bc');
+		}
+		let device = await adapter.requestDevice({ requiredFeatures });
 
 		const vertexStorageLimit =
 			device.limits.maxStorageBuffersInVertexStage ?? device.limits.maxStorageBuffersPerShaderStage;
@@ -3654,6 +3707,7 @@ Q5._requestGPU = async () => {
 		Q5.MAX_TEXTS = min(Q5.MAX_TEXTS, floor(maxStorage / 32));
 
 		device.lost.then((e) => {
+			if (!e || (e.reason === undefined && e.message === undefined)) return;
 			console.error('WebGPU crashed!');
 			console.error(e);
 		});
