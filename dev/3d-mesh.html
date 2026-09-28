@@ -46,7 +46,7 @@
       createCanvas(700, 500);
       pg3d = createGraphics(700, 500, '3d');
 
-      // インデックスと UV の初期構築
+      // Initial build of indices and UVs
       for (let y = 0; y < gridRows; y++) {
         for (let x = 0; x < gridCols; x++) {
           const idx = y * gridCols + x;
@@ -75,10 +75,10 @@
     function draw() {
       if (!pg3d || !waveMesh) return;
 
-      // 1. 2D 背景
+      // 1. 2D background
       background(20, 20, 30);
 
-      // 2. 3D シーン
+      // 2. 3D scene
       pg3d.clear();
       pg3d.camera(350, -280, 350, 0, 0, 0, 0, 1, 0);
       pg3d.orbitControl(true);
@@ -86,7 +86,7 @@
       pg3d.directionalLight(255, 240, 220, 0.6, 0.8, 0.4);
       pg3d.ambientLight(70, 70, 90);
 
-      // --- A. Dynamic Mesh（毎フレーム波の高さを更新 & 法線再計算） ---
+      // --- A. Dynamic Mesh (update wave heights per frame & recompute normals) ---
       const time = frameCount * 0.04;
       for (let y = 0; y < gridRows; y++) {
         for (let x = 0; x < gridCols; x++) {
@@ -109,7 +109,7 @@
       pg3d.drawMesh(waveMesh);
       pg3d.pop();
 
-      // --- B. beginShape / vertex / endShape カスタム多面体 ---
+      // --- B. beginShape / vertex / endShape custom polyhedron ---
       pg3d.push();
       pg3d.translate(0, -110, 0);
       pg3d.rotateY(frameCount * 0.02);
@@ -120,22 +120,22 @@
 
       const s = 40, h = 50;
       pg3d.beginShape('TRIANGLES');
-      // 面 1
+      // Face 1
       pg3d.normal(0, 0.7, 0.7);
       pg3d.vertex(0, -h, 0, 0.5, 1);
       pg3d.vertex(-s, 0, s, 0, 0);
       pg3d.vertex(s, 0, s, 1, 0);
-      // 面 2
+      // Face 2
       pg3d.normal(0.7, 0.7, 0);
       pg3d.vertex(0, -h, 0, 0.5, 1);
       pg3d.vertex(s, 0, s, 0, 0);
       pg3d.vertex(s, 0, -s, 1, 0);
-      // 面 3
+      // Face 3
       pg3d.normal(0, 0.7, -0.7);
       pg3d.vertex(0, -h, 0, 0.5, 1);
       pg3d.vertex(s, 0, -s, 0, 0);
       pg3d.vertex(-s, 0, -s, 1, 0);
-      // 面 4
+      // Face 4
       pg3d.normal(-0.7, 0.7, 0);
       pg3d.vertex(0, -h, 0, 0.5, 1);
       pg3d.vertex(-s, 0, -s, 0, 0);
@@ -144,11 +144,11 @@
 
       pg3d.pop();
 
-      // 3D 描画 & 2D 合成
+      // 3D rendering & 2D composite
       pg3d.flush();
       image(pg3d, 0, 0);
 
-      // 3. 2D オーバーレイ
+      // 3. 2D overlay
       fill(255);
       noStroke();
       textSize(16);
