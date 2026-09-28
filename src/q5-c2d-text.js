@@ -300,8 +300,8 @@ Q5.renderers.c2d.text = ($, q) => {
 					if (lineWidth > maxWidth) maxWidth = lineWidth;
 				}
 
-				let imgW = Math.max(1, Math.ceil(maxWidth)),
-					imgH = Math.max(1, Math.ceil(leading * lines.length + descent));
+				let imgW = Math.ceil(maxWidth),
+					imgH = Math.ceil(leading * lines.length + descent);
 
 				img = $.createImage.call($, imgW, imgH, {
 					pixelDensity: $._pixelDensity,

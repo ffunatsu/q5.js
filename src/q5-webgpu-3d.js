@@ -591,12 +591,9 @@
 			const format = navigator.gpu.getPreferredCanvasFormat();
 
 			const setup = () => {
-				const isNativeOffscreen = typeof globalThis !== 'undefined' && globalThis.__mystral && $._isGraphics;
-				// console.log(`[q5-webgpu-3d.js:429] setup: isNativeOffscreen=${isNativeOffscreen} (globalThis.__mystral=${typeof globalThis !== 'undefined' ? globalThis.__mystral : 'undefined'}, $._isGraphics=${$._isGraphics})`);
-				if (!isNativeOffscreen && typeof c.getContext === 'function') {
+				if (typeof c.getContext === 'function') {
 					try {
 						ctx = q.ctx = q.drawingContext = c.getContext('webgpu');
-						// console.log(`[q5-webgpu-3d.js:433] c.getContext('webgpu') executed: ctx=${ctx ? 'GPUCanvasContext' : 'null'}`);
 						if (ctx) {
 							ctx.configure({
 								device: Q5.device,
@@ -605,10 +602,8 @@
 							});
 						}
 					} catch (e) {
-						console.error(`[q5-webgpu-3d.js:441] context configure error:`, e);
+						console.error(`[q5-webgpu-3d.js] context configure error:`, e);
 					}
-				} else {
-					// console.log(`[q5-webgpu-3d.js:444] Skipped c.getContext('webgpu') for native offscreen targetTexture`);
 				}
 				ensureTextures();
 				initPipelines();

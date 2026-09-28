@@ -66,18 +66,16 @@ Q5.modules.sound = ($, q) => {
 	$.getAudioContext = () => Q5.aud;
 
 	$.userStartAudio = () => {
-		if (globalThis.__mystral && !Q5.aud) {
-			Q5.aud = window.AudioContext ? window.AudioContext() : { state: 'running', resume() {} };
-		}
 		if (window.AudioContext) {
 			if (Q5._offlineAudio) {
 				Q5._offlineAudio = false;
 				Q5.aud = new window.AudioContext();
-			}
-			if (!Q5.soundOut && Q5.aud.createGain) {
 				Q5.soundOut = Q5.aud.createGain();
 				Q5.soundOut.connect(Q5.aud.destination);
-				for (let inst of Q5.instances) inst._userAudioStarted();
+
+				for (let inst of Q5.instances) {
+					inst._userAudioStarted();
+				}
 			}
 			return Q5.aud.resume();
 		}
@@ -118,7 +116,7 @@ Q5.Sound = class {
 		if (!this.buffer.length) return;
 
 		this.gainNode = Q5.aud.createGain();
-		this.pannerNode = Q5.aud.createStereoPanner ? Q5.aud.createStereoPanner() : this.gainNode;
+		this.pannerNode = Q5.aud.createStereoPanner();
 		this.gainNode.connect(this.pannerNode);
 		this.pannerNode.connect(Q5.soundOut);
 
@@ -130,7 +128,6 @@ Q5.Sound = class {
 	_newSource(offset, duration) {
 		let source = Q5.aud.createBufferSource();
 		source.buffer = this.buffer;
-		if (source._setBuffer) source._setBuffer(this.buffer);
 		source.connect(this.gainNode);
 		source.loop = this._loop;
 
