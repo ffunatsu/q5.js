@@ -41,7 +41,7 @@
     function updateTexture() {
       pgTex.background(30, 40, 60);
 
-      // チェッカーボード
+      // Checkerboard
       const s = 32;
       for (let x = 0; x < 256; x += s) {
         for (let y = 0; y < 256; y += s) {
@@ -53,14 +53,14 @@
         }
       }
 
-      // 動くアニメーション円
+      // Animated moving circle
       pgTex.fill(255, 80, 80);
       pgTex.noStroke();
       let cx = 128 + Math.cos(frameCount * 0.05) * 60;
       let cy = 128 + Math.sin(frameCount * 0.05) * 60;
       pgTex.circle(cx, cy, 50);
 
-      // ラベル
+      // Label
       pgTex.fill(20);
       pgTex.textSize(24);
       pgTex.textAlign(CENTER, CENTER);
@@ -72,10 +72,10 @@
 
       updateTexture();
 
-      // 1. 2D 背景
+      // 1. 2D background
       background(15, 18, 25);
 
-      // 2. 3D シーン
+      // 2. 3D scene
       pg3d.clear();
       pg3d.camera(300, -250, 350, 0, 0, 0, 0, 1, 0);
       pg3d.orbitControl(true);
@@ -83,10 +83,10 @@
       pg3d.directionalLight(255, 255, 255, 0.5, 0.8, 0.6);
       pg3d.ambientLight(100, 100, 120);
 
-      // テクスチャをバインド
+      // Bind texture
       pg3d.texture(pgTex);
 
-      // A. テクスチャ付き回転ボックス
+      // A. Rotating textured box
       pg3d.push();
       pg3d.translate(-100, 0, 0);
       pg3d.rotateX(frameCount * 0.01);
@@ -95,7 +95,7 @@
       pg3d.box(110);
       pg3d.pop();
 
-      // B. テクスチャ付き球体
+      // B. Textured sphere
       pg3d.push();
       pg3d.translate(100, 0, 0);
       pg3d.rotateY(frameCount * 0.02);
@@ -103,7 +103,7 @@
       pg3d.sphere(65, 24, 18);
       pg3d.pop();
 
-      // C. テクスチャなし（カラーのみ）の床プレーン
+      // C. Untextured (color-only) floor plane
       pg3d.noTexture();
       pg3d.push();
       pg3d.translate(0, 100, 0);
@@ -112,17 +112,17 @@
       pg3d.plane(340, 340);
       pg3d.pop();
 
-      // 3D 描画 & 2D 合成
+      // 3D rendering & 2D composite
       pg3d.flush();
       image(pg3d, 0, 0);
 
-      // 3. 2D オーバーレイ
+      // 3. 2D overlay
       fill(255);
       noStroke();
       textSize(16);
       text("q5.js 3D WebGPU - Texture Mapping (texture(img))", 20, 30);
       
-      // テクスチャのプレビューを左下に小さく表示
+      // Show small preview of texture at bottom-left
       image(pgTex, 20, height - 100, 80, 80);
       
       fill(180);
