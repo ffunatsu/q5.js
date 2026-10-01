@@ -591,12 +591,9 @@
 			const format = navigator.gpu.getPreferredCanvasFormat();
 
 			const setup = () => {
-				const isNativeOffscreen = typeof globalThis !== 'undefined' && globalThis.__mystral && $._isGraphics;
-				// console.log(`[q5-webgpu-3d.js:429] setup: isNativeOffscreen=${isNativeOffscreen} (globalThis.__mystral=${typeof globalThis !== 'undefined' ? globalThis.__mystral : 'undefined'}, $._isGraphics=${$._isGraphics})`);
-				if (!isNativeOffscreen && typeof c.getContext === 'function') {
+				if (typeof c.getContext === 'function') {
 					try {
 						ctx = q.ctx = q.drawingContext = c.getContext('webgpu');
-						// console.log(`[q5-webgpu-3d.js:433] c.getContext('webgpu') executed: ctx=${ctx ? 'GPUCanvasContext' : 'null'}`);
 						if (ctx) {
 							ctx.configure({
 								device: Q5.device,
@@ -605,10 +602,8 @@
 							});
 						}
 					} catch (e) {
-						console.error(`[q5-webgpu-3d.js:441] context configure error:`, e);
+						console.error(`[q5-webgpu-3d.js] context configure error:`, e);
 					}
-				} else {
-					// console.log(`[q5-webgpu-3d.js:444] Skipped c.getContext('webgpu') for native offscreen targetTexture`);
 				}
 				ensureTextures();
 				initPipelines();
@@ -647,12 +642,24 @@
 		$.scale = (x, y = x, z = (typeof y === 'number' ? y : x)) => {
 			modelMatrix = Mat4.scale(modelMatrix, [x, y, z]);
 		};
+		const styleStack = [];
 		$.push = () => {
 			matrixStack.push(new Float32Array(modelMatrix));
+			styleStack.push([currentFill.slice(), currentStroke.slice(), hasFill, hasStroke, strokeThickness, _colorMode, _colorFormat]);
 		};
 		$.pop = () => {
 			if (matrixStack.length > 0) {
 				modelMatrix = matrixStack.pop();
+			}
+			if (styleStack.length > 0) {
+				const s = styleStack.pop();
+				currentFill = s[0];
+				currentStroke = s[1];
+				hasFill = s[2];
+				hasStroke = s[3];
+				strokeThickness = s[4];
+				_colorMode = s[5];
+				_colorFormat = s[6];
 			}
 		};
 		$.resetMatrix = () => {
@@ -738,35 +745,86 @@
 			}
 		};
 
+		// Color Mode & Normalization
+		let _colorMode = 'rgb';
+		let _colorFormat = 1; // Default WebGPU 0.0 - 1.0 float RGB
+
+		$.colorMode = (mode, format) => {
+			if (typeof mode === 'number') {
+				// e.g. colorMode(255, RGB)
+				const tmp = mode;
+				mode = format || 'rgb';
+				format = tmp;
+			}
+			_colorMode = (mode || 'rgb').toLowerCase();
+			_colorFormat = format === 'integer' || format === 255 ? 255 : 1;
+		};
+
+		function parseColor(r, g, b, a) {
+			if (r != null && r._isColor) {
+				let c = r;
+				if (c.r !== undefined) {
+					r = c.r; g = c.g; b = c.b; a = c.a ?? a;
+				} else if (c.levels) {
+					[r, g, b, a] = c.levels;
+				}
+			} else if (typeof r === 'string') {
+				if (typeof $.color === 'function') {
+					const c = $.color(r);
+					return parseColor(c);
+				}
+			} else if (Array.isArray(r) || (r && r.buffer instanceof ArrayBuffer)) {
+				[r, g, b, a] = r;
+			} else if (g === undefined) {
+				// Grayscale: fill(0.5) or fill(255)
+				g = b = r;
+				a ??= _colorFormat;
+			} else if (b === undefined) {
+				// Grayscale + alpha: fill(0.5, 0.8) or fill(128, 255)
+				a = g;
+				g = b = r;
+			}
+			a ??= _colorFormat;
+
+			if (_colorFormat === 255 || r > 1 || g > 1 || b > 1 || (a !== undefined && a > 1)) {
+				return [r / 255, g / 255, b / 255, a > 1 ? a / 255 : a];
+			}
+			return [r, g, b, a];
+		}
+
 		// Lights
 		$.ambientLight = (r, g = r, b = g) => {
-			ambientLightColor = [r / 255, g / 255, b / 255];
+			const c = parseColor(r, g, b);
+			ambientLightColor = [c[0], c[1], c[2]];
 		};
 		$.directionalLight = (r, g, b, x = 1, y = 1, z = -1) => {
-			dirLightColor = [r / 255, g / 255, b / 255];
+			const c = parseColor(r, g, b);
+			dirLightColor = [c[0], c[1], c[2]];
 			const len = Math.hypot(x, y, z) || 1;
 			dirLightDir = [x / len, y / len, z / len];
 		};
 		$.pointLight = (r, g, b, x = 0, y = 0, z = 0) => {
-			pointLightColor = [r / 255, g / 255, b / 255, 1.0];
+			const c = parseColor(r, g, b);
+			pointLightColor = [c[0], c[1], c[2], 1.0];
 			pointLightPos = [x, y, z];
 		};
 		$.spotLight = (r, g, b, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = -1, angle = Math.PI / 6) => {
-			spotLightColor = [r / 255, g / 255, b / 255, 1.0];
+			const c = parseColor(r, g, b);
+			spotLightColor = [c[0], c[1], c[2], 1.0];
 			spotLightPos = [x, y, z];
 			const len = Math.hypot(rx, ry, rz) || 1;
 			spotLightDir = [rx / len, ry / len, rz / len, angle];
 		};
 
 		// Style & Colors
-		$.fill = (r, g = r, b = g, a = 255) => {
+		$.fill = (r, g, b, a) => {
 			hasFill = true;
-			currentFill = [r / 255, g / 255, b / 255, a / 255];
+			currentFill = parseColor(r, g, b, a);
 		};
 		$.noFill = () => { hasFill = false; };
-		$.stroke = (r, g = r, b = g, a = 255) => {
+		$.stroke = (r, g, b, a) => {
 			hasStroke = true;
-			currentStroke = [r / 255, g / 255, b / 255, a / 255];
+			currentStroke = parseColor(r, g, b, a);
 		};
 		$.noStroke = () => { hasStroke = false; };
 		$.strokeWeight = (w) => { strokeThickness = w; };
@@ -1398,7 +1456,14 @@
 			}
 		};
 
+		let clearColor = { r: 0, g: 0, b: 0, a: 0 };
+		$.background = (r, g, b, a) => {
+			const c = parseColor(r, g, b, a);
+			clearColor = { r: c[0], g: c[1], b: c[2], a: c[3] };
+		};
+
 		$.clear = () => {
+			clearColor = { r: 0, g: 0, b: 0, a: 0 };
 			triVertices.length = 0;
 			lineVertices.length = 0;
 			triBatches.length = 0;
@@ -1478,14 +1543,14 @@
 				colorAttachment = {
 					view: msaaColorTexture.createView(),
 					resolveTarget: currentTextureView,
-					clearValue: { r: 0, g: 0, b: 0, a: 0 },
+					clearValue: clearColor,
 					loadOp: 'clear',
 					storeOp: 'store'
 				};
 			} else {
 				colorAttachment = {
 					view: currentTextureView,
-					clearValue: { r: 0, g: 0, b: 0, a: 0 },
+					clearValue: clearColor,
 					loadOp: 'clear',
 					storeOp: 'store'
 				};

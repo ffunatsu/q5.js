@@ -2691,9 +2691,6 @@ fn fragMain(f: FragParams) -> @location(0) vec4f {
 				$._addTexture(img, img._texture);
 			}
 			img.modified = false;
-			if ($.frameCount <= 5) {
-				console.log(`[WebGPU 2D] image(pg3d): frame=${$.frameCount}, textureIndex=${img._texture?.index}`);
-			}
 		}
 
 		if (img.modified && img._renderer !== '3d') {

@@ -19,24 +19,28 @@
       box-shadow: 0 6px 18px rgba(0,0,0,0.6);
     }
   </style>
-  <script src="../q5.js"></script>
-  <script src="../src/q5-webgpu-3d.js"></script>
 </head>
 <body>
   <h2>q5.js 3D WebGPU - Texture Mapping (texture(img))</h2>
-  <script>
+  <script type="module">
+    import '../q5.js';
+    import '../src/q5-webgpu-3d.js';
+
+    new Q5('global');
+
     let pg3d;
     let pgTex;
 
-    async function setup() {
+    window.setup = async function() {
       if (typeof Q5.initWebGPU === 'function') {
         await Q5.initWebGPU();
       }
 
       createCanvas(700, 500);
       pg3d = createGraphics(700, 500, '3d');
+      pg3d.colorMode(255, 'rgb');
       pgTex = createGraphics(256, 256);
-    }
+    };
 
     function updateTexture() {
       pgTex.background(30, 40, 60);
@@ -67,7 +71,7 @@
       pgTex.text("WebGPU 3D", 128, 128);
     }
 
-    function draw() {
+    window.draw = function() {
       if (!pg3d || !pgTex) return;
 
       updateTexture();

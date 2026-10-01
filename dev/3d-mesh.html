@@ -19,12 +19,15 @@
       box-shadow: 0 6px 18px rgba(0,0,0,0.6);
     }
   </style>
-  <script src="../q5.js"></script>
-  <script src="../src/q5-webgpu-3d.js"></script>
 </head>
 <body>
   <h2>q5.js 3D WebGPU - Dynamic Mesh & beginShape()</h2>
-  <script>
+  <script type="module">
+    import '../q5.js';
+    import '../src/q5-webgpu-3d.js';
+
+    new Q5('global');
+
     let pg3d;
     const gridCols = 24;
     const gridRows = 24;
@@ -38,13 +41,14 @@
     const indices = [];
     let waveMesh;
 
-    async function setup() {
+    window.setup = async function() {
       if (typeof Q5.initWebGPU === 'function') {
         await Q5.initWebGPU();
       }
 
       createCanvas(700, 500);
       pg3d = createGraphics(700, 500, '3d');
+      pg3d.colorMode(255, 'rgb');
 
       // Initial build of indices and UVs
       for (let y = 0; y < gridRows; y++) {
@@ -70,9 +74,9 @@
         uvs: uvs,
         indices: new Uint16Array(indices)
       });
-    }
+    };
 
-    function draw() {
+    window.draw = function() {
       if (!pg3d || !waveMesh) return;
 
       // 1. 2D background

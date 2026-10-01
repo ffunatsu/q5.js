@@ -37,8 +37,6 @@
       background: #3d5269;
     }
   </style>
-  <script src="../q5.js"></script>
-  <script src="../src/q5-webgpu-3d.js"></script>
 </head>
 <body>
   <h2>q5.js 3D - Camera & Projection Controls</h2>
@@ -49,47 +47,27 @@
   </div>
   <p style="color: #aaa; font-size: 14px;">Drag mouse to orbit | [Space]: Ortho/Perspective | [C]: Camera angle | [1, 2, 3]: Primitives</p>
 
-  <script>
+  <script type="module">
+    import '../q5.js';
+    import '../src/q5-webgpu-3d.js';
+
+    new Q5('global');
+
     let pg3d;
     let isOrthoMode = false;
     let cameraMode = 0; // 0: Front-top, 1: Isometric, 2: Top-down
     let showShape = 0;  // 0: All, 1: Box, 2: Sphere
 
-    async function setup() {
-      if (typeof Q5.initWebGPU === 'function') {
-        await Q5.initWebGPU();
-      }
-
-      createCanvas(700, 480);
-      pg3d = createGraphics(700, 480, '3d');
-      updateProjection();
-    }
-
-    function toggleProjection() {
-      isOrthoMode = !isOrthoMode;
-      updateProjection();
-    }
-
-    function updateProjection() {
+    window.updateProjection = function() {
       if (!pg3d) return;
       if (isOrthoMode) {
         pg3d.ortho(-350, 350, -240, 240, -2000, 2000);
       } else {
         pg3d.perspective(Math.PI / 3, 700 / 480, 0.1, 5000);
       }
-    }
+    };
 
-    function toggleCameraPos() {
-      cameraMode = (cameraMode + 1) % 3;
-      applyCameraPreset();
-    }
-
-    function resetView() {
-      cameraMode = 0;
-      applyCameraPreset();
-    }
-
-    function applyCameraPreset() {
+    window.applyCameraPreset = function() {
       if (!pg3d) return;
       if (cameraMode === 0) {
         pg3d.camera(0, -100, 450, 0, 0, 0, 0, 1, 0);
@@ -98,18 +76,44 @@
       } else if (cameraMode === 2) {
         pg3d.camera(0, -500, 1, 0, 0, 0, 0, 0, -1);
       }
-    }
+    };
 
-    function keyPressed() {
-      if (key === ' ' || keyCode === 32) toggleProjection();
-      if (key === 'c' || key === 'C') toggleCameraPos();
-      if (key === 'r' || key === 'R') resetView();
+    window.toggleProjection = function() {
+      isOrthoMode = !isOrthoMode;
+      window.updateProjection();
+    };
+
+    window.toggleCameraPos = function() {
+      cameraMode = (cameraMode + 1) % 3;
+      window.applyCameraPreset();
+    };
+
+    window.resetView = function() {
+      cameraMode = 0;
+      window.applyCameraPreset();
+    };
+
+    window.setup = async function() {
+      if (typeof Q5.initWebGPU === 'function') {
+        await Q5.initWebGPU();
+      }
+
+      createCanvas(700, 480);
+      pg3d = createGraphics(700, 480, '3d');
+      pg3d.colorMode(255, 'rgb');
+      window.updateProjection();
+    };
+
+    window.keyPressed = function() {
+      if (key === ' ' || keyCode === 32) window.toggleProjection();
+      if (key === 'c' || key === 'C') window.toggleCameraPos();
+      if (key === 'r' || key === 'R') window.resetView();
       if (key === '1') showShape = 0;
       if (key === '2') showShape = 1;
       if (key === '3') showShape = 2;
-    }
+    };
 
-    function draw() {
+    window.draw = function() {
       if (!pg3d) return;
 
       // 1. 2D Background
