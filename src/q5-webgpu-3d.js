@@ -591,7 +591,8 @@
 			const format = navigator.gpu.getPreferredCanvasFormat();
 
 			const setup = () => {
-				if (typeof c.getContext === 'function') {
+				const isNativeOffscreen = typeof globalThis !== 'undefined' && (globalThis.__mystral || globalThis.isMystral) && $._isGraphics;
+				if (!isNativeOffscreen && typeof c.getContext === 'function') {
 					try {
 						ctx = q.ctx = q.drawingContext = c.getContext('webgpu');
 						if (ctx) {
@@ -1488,7 +1489,7 @@
 			const device = Q5.device;
 			let currentTextureView;
 			let targetType = 'none';
-			if (ctx) {
+			if (ctx && !$._isGraphics) {
 				try {
 					currentTextureView = ctx.getCurrentTexture().createView();
 					targetType = 'swapchain(ctx)';
