@@ -180,11 +180,11 @@ function Q5(scope, parent, renderer) {
 		}
 		$._redraw = false;
 	};
-	$.remove = () => {
+	$.remove = async () => {
 		$._removed = true;
 		$.noLoop();
 		if ($.canvas.remove) $.canvas.remove();
-		return runHooks('remove');
+		await runHooks('remove');
 	};
 
 	$.frameRate = (hz) => {
@@ -508,7 +508,6 @@ if (typeof document == 'object') {
 	if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
 	else setTimeout(init, 0); // defer until the rest of q5.js is run
 }
-
 Q5.modules.canvas = ($, q) => {
 	$._Canvas =
 		window.OffscreenCanvas ||
@@ -850,7 +849,6 @@ Q5.canvasOptions = {
 if (!window.matchMedia || !matchMedia('(dynamic-range: high) and (color-gamut: p3)').matches) {
 	Q5.canvasOptions.colorSpace = 'srgb';
 } else Q5.supportsHDR = true;
-
 Q5.renderers.c2d = {};
 
 Q5.renderers.c2d.canvas = ($, q) => {
@@ -1086,7 +1084,6 @@ Q5.renderers.c2d.canvas = ($, q) => {
 		popStyles();
 	};
 };
-
 Q5.renderers.c2d.shapes = ($) => {
 	$.__doStroke = true;
 	$.__doFill = true;
@@ -1435,7 +1432,6 @@ Q5.renderers.c2d.shapes = ($) => {
 		return $.ctx.isPointInStroke(x * pd, y * pd);
 	};
 };
-
 Q5.renderers.c2d.image = ($, q) => {
 	const c = $.canvas;
 
@@ -1840,7 +1836,6 @@ Q5.Image = class {
 		return this.height;
 	}
 };
-
 /* software implementation of image filters */
 Q5.renderers.c2d.softFilters = ($) => {
 	let u = null; // uint8 temporary buffer
@@ -1986,7 +1981,6 @@ Q5.renderers.c2d.softFilters = ($) => {
 		$.ctx.putImageData(imgData, 0, 0);
 	};
 };
-
 Q5.renderers.c2d.text = ($, q) => {
 	$._textAlign = 'left';
 	$._textBaseline = 'alphabetic';
@@ -2473,7 +2467,6 @@ Q5.renderers.c2d.text = ($, q) => {
 
 Q5.fonts = [];
 Q5.MAX_TEXT_IMAGES = 5000;
-
 Q5.modules.color = ($, q) => {
 	$.RGB = $.RGBA = $.RGBHDR = $._colorMode = 'rgb';
 	$.HSL = 'hsl';
@@ -2507,7 +2500,6 @@ Q5.modules.color = ($, q) => {
 
 	$._namedColors = {
 		aqua: [0, 255, 255],
-		beige: [245, 245, 220],
 		black: [0, 0, 0],
 		blue: [0, 0, 255],
 		brown: [165, 42, 42],
@@ -2967,7 +2959,6 @@ Q5.HSBtoHSL = (h, s, v, l = v * (1 - s / 200)) => [h, !l || l == 100 ? 0 : ((v -
 
 	Q5.OKLCHtoRGB = (l, c, h) => srgbLinear2rgb(xyz2rgbLinear(oklab2xyz(oklch2oklab(l, c, h))));
 }
-
 Q5.modules.display = ($) => {
 	if (!$.canvas || $._isGraphics) return;
 
@@ -3081,7 +3072,6 @@ main {
 		else document.exitFullscreen();
 	};
 };
-
 Q5.modules.dom = ($, q) => {
 	$.elementMode = (mode) => ($._elementMode = mode);
 
@@ -3446,7 +3436,6 @@ Q5.modules.dom = ($, q) => {
 	$.findEl = (selector) => document.querySelector(selector);
 	$.findEls = (selector) => document.querySelectorAll(selector);
 };
-
 Q5.modules.fes = ($) => {
 	$._fes = async (e) => {
 		if (Q5.disableFriendlyErrors) return;
@@ -3546,7 +3535,6 @@ Q5.friendlyError = (file, lineNum, detail) => {
 
 	console.log(`%c${prefix}%c ${msg}`, 'background: #b7ebff; color: #000;', '');
 };
-
 Q5.modules.input = ($, q) => {
 	if ($._isGraphics) return;
 
@@ -3856,7 +3844,6 @@ Q5.modules.input = ($, q) => {
 		l('touchcancel', (e) => $._ontouchend(e));
 	}
 };
-
 Q5.modules.math = ($, q) => {
 	$.RADIANS = 0;
 	$.DEGREES = 1;
@@ -4288,7 +4275,6 @@ Q5.PerlinNoise = class extends Q5.NoiseGenerator {
 		return (total / maxAmp + 1) / 2;
 	}
 };
-
 Q5.modules.record = ($, q) => {
 	let rec, btn0, btn1, timer, formatSelect, bitrateInput, audioToggle;
 
@@ -4665,7 +4651,6 @@ Q5.modules.record = ($, q) => {
 		q.recording = false;
 	};
 };
-
 Q5.modules.sound = ($, q) => {
 	$.Sound = Q5.Sound;
 	let sounds = [];
@@ -4924,7 +4909,6 @@ Q5.Sound = class {
 		this._onended = cb;
 	}
 };
-
 Q5.modules.util = ($, q) => {
 	$._loadFile = (url, cb, type) => {
 		let ret = {};
@@ -5101,7 +5085,6 @@ Q5.CSV.parse = (csv, sep = ',', lineSep = '\n') => {
 	}
 	return a;
 };
-
 Q5.modules.vector = ($) => {
 	$.Vector = Q5.Vector;
 	$.createVector = (x, y, z) => new $.Vector(x, y, z, $);
@@ -5446,7 +5429,6 @@ Q5.Vector.random2D = () => new Q5.Vector().random2D();
 Q5.Vector.random3D = () => new Q5.Vector().random3D();
 Q5.Vector.fromAngle = (th, l) => new Q5.Vector().fromAngle(th, l);
 Q5.Vector.fromAngles = (th, ph, l) => new Q5.Vector().fromAngles(th, ph, l);
-
 Q5.renderers.webgpu = {};
 
 Q5.renderers.webgpu.canvas = ($, q) => {
@@ -9052,7 +9034,7 @@ fn fragMain(f : FragParams) -> @location(0) vec4f {
 		for (let b of $._buffers) b.destroy();
 		$._buffers = [];
 
-		return _remove();
+		_remove();
 	};
 };
 
@@ -9116,16 +9098,8 @@ Q5._requestGPU = async () => {
 		Q5.MAX_TEXTS = min(Q5.MAX_TEXTS, floor(maxStorage / 32));
 
 		device.lost.then((e) => {
-			if (!e || (e.reason === undefined && e.message === undefined)) return;
-			// if purposefully destroyed, do nothing.
-			if (e.reason == 'destroyed') return;
-			// else attempt restart
 			console.error('WebGPU crashed!');
 			console.error(e);
-			requestAnimationFrame(async () => {
-				Q5.device = Q5._gpuTask = null;
-				await Q5.initWebGPU();
-			});
 		});
 
 		Q5.device = device;
@@ -9150,7 +9124,6 @@ Q5.WebGPU = async function (scope, parent) {
 	await q.ready;
 	return q;
 };
-
 /**
  * q5.js 3D WebGPU Renderer Extension
  * Standalone add-on for 3D graphics in q5.js
@@ -10719,7 +10692,6 @@ Q5.WebGPU = async function (scope, parent) {
 		$.flush = $._render;
 	};
 })();
-
 const supportedLangs = ['es'];
 
 const libLangs = `
@@ -11254,7 +11226,6 @@ Q5.addHook('predraw', (q) => {
 		}
 	}
 });
-
 const runPython = async function () {
 	let scripts = [...document.getElementsByTagName('script')].filter(
 		(s) => s.type == 'q5-python' || s.type == 'text/q5-python'

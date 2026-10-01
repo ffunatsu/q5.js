@@ -31,7 +31,6 @@ Q5.modules.color = ($, q) => {
 
 	$._namedColors = {
 		aqua: [0, 255, 255],
-		beige: [245, 245, 220],
 		black: [0, 0, 0],
 		blue: [0, 0, 255],
 		brown: [165, 42, 42],

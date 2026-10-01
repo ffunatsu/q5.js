@@ -180,11 +180,11 @@ function Q5(scope, parent, renderer) {
 		}
 		$._redraw = false;
 	};
-	$.remove = () => {
+	$.remove = async () => {
 		$._removed = true;
 		$.noLoop();
 		if ($.canvas.remove) $.canvas.remove();
-		return runHooks('remove');
+		await runHooks('remove');
 	};
 
 	$.frameRate = (hz) => {
