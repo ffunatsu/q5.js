@@ -4550,30 +4550,6 @@ declare global {
 
 	}
 
-	namespace Q5 {
-		interface Imagen {
-			ancho: number;
-			alto: number;
-			defectoAncho: number;
-			defectoAlto: number;
-			espejoX: boolean;
-			espejoY: boolean;
-			copiar(): Q5.Imagen;
-			obtener(x: number, y: number, w?: number, h?: number): Q5.Imagen | number[];
-			establecer(x: number, y: number, val: any): void;
-			redimensionar(w: number, h: number): void;
-			enmascarar(img: Q5.Imagen): void;
-			recortar(): Q5.Imagen;
-			filtro(tipo: string, valor?: number): void;
-			cargarPixeles(): void;
-			actualizarPixeles(): void;
-			guardar(nombreArchivo?: string): void;
-		}
-
-		export import Color = globalThis.Color;
-		export import Vector = globalThis.Vector;
-	}
-
 }
 
 export {};
