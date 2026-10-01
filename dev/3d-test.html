@@ -19,28 +19,28 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
   </style>
-  <script src="../q5.js"></script>
-  <script src="../src/q5-webgpu-3d.js"></script>
 </head>
 <body>
   <h2>q5.js 3D (WebGPU) + 2D Layering Prototype</h2>
-  <script>
+  <script type="module">
+    import Q5 from '../q5.js';
+    import '../src/q5-webgpu-3d.js';
+
+    new Q5('global');
+
     let pg3d;
 
-    async function setup() {
-      // 1. Initialize WebGPU
+    window.setup = async () => {
       if (typeof Q5.initWebGPU === 'function') {
         await Q5.initWebGPU();
       }
 
-      // 2. Create 2D Main Canvas
       createCanvas(600, 400);
-
-      // 3. Create 3D Graphics layer
       pg3d = createGraphics(600, 400, '3d');
-    }
+      pg3d.colorMode(255, 'rgb');
+    };
 
-    function draw() {
+    window.draw = () => {
       if (!pg3d) return;
 
       // 1. 2D Background

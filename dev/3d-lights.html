@@ -38,8 +38,6 @@
       border-color: #619bd6;
     }
   </style>
-  <script src="../q5.js"></script>
-  <script src="../src/q5-webgpu-3d.js"></script>
 </head>
 <body>
   <h2>q5.js 3D - Lights (Directional, Point, Spot)</h2>
@@ -50,33 +48,39 @@
   </div>
   <p style="color: #aaa; font-size: 14px;">Drag mouse to orbit view | Press [1], [2], [3] to toggle lighting modes</p>
 
-  <script>
+  <script type="module">
+    import Q5 from '../q5.js';
+    import '../src/q5-webgpu-3d.js';
+
+    new Q5('global');
+
     let pg3d;
     let lightMode = 'dir'; // 'dir', 'point', 'spot'
 
-    async function setup() {
+    window.setLightMode = function(mode) {
+      lightMode = mode;
+      document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+      const activeBtn = document.getElementById('btn-' + mode);
+      if (activeBtn) activeBtn.classList.add('active');
+    };
+
+    window.keyPressed = function() {
+      if (key === '1') window.setLightMode('dir');
+      if (key === '2') window.setLightMode('point');
+      if (key === '3') window.setLightMode('spot');
+    };
+
+    window.setup = async function() {
       if (typeof Q5.initWebGPU === 'function') {
         await Q5.initWebGPU();
       }
 
       createCanvas(700, 480);
       pg3d = createGraphics(700, 480, '3d');
-    }
+      pg3d.colorMode(255, 'rgb');
+    };
 
-    function setLightMode(mode) {
-      lightMode = mode;
-      document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
-      const activeBtn = document.getElementById('btn-' + mode);
-      if (activeBtn) activeBtn.classList.add('active');
-    }
-
-    function keyPressed() {
-      if (key === '1') setLightMode('dir');
-      if (key === '2') setLightMode('point');
-      if (key === '3') setLightMode('spot');
-    }
-
-    function draw() {
+    window.draw = function() {
       if (!pg3d) return;
 
       // 1. 2D Background
