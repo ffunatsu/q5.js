@@ -3652,7 +3652,7 @@ fn fragMain(f : FragParams) -> @location(0) vec4f {
 		for (let b of $._buffers) b.destroy();
 		$._buffers = [];
 
-		_remove();
+		return _remove();
 	};
 };
 
@@ -3721,8 +3721,15 @@ Q5._requestGPU = async () => {
 
 		device.lost.then((e) => {
 			if (!e || (e.reason === undefined && e.message === undefined)) return;
+			// if purposefully destroyed, do nothing.
+			if (e.reason == 'destroyed') return;
+			// else attempt restart
 			console.error('WebGPU crashed!');
 			console.error(e);
+			requestAnimationFrame(async () => {
+				Q5.device = Q5._gpuTask = null;
+				await Q5.initWebGPU();
+			});
 		});
 
 		Q5.device = device;
