@@ -1,5 +1,5 @@
 /**
- * @module q5/c2d
+ * @module C:\Users\Owner\lab\q5js/3d\defs\q5/c2d
  */
 
 declare global {
